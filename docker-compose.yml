@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development # Set to development for local development
+      # You would typically add your database connection string and other secrets here
+      # For example:
+      # - MONGO_URI=mongodb://mongodb:27017/your-db
+      # - JWT_SECRET=your-jwt-secret
+      # - CLOUDINARY_URL=your-cloudinary-url
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80" # Map host port 3000 to container port 80 (Nginx default)
+    volumes:
+      - ./frontend/src:/app/src # Mount the src directory for hot-reloading
+    depends_on:
+      - backend
+
+# You could also add a database service here, for example:
+#
+# mongodb:
+#   image: mongo:latest
+#   ports:
+#     - "27017:27017"
+#   volumes:
+#     - mongo-data:/data/db
+#
+# volumes:
+#   mongo-data:
