@@ -140,7 +140,7 @@ Key highlights include:
      ```
    - Create a `.env` file with the following variable:
      ```plaintext
-     REACT_APP_API_URL=http://localhost:5000/api
+     REACT_APP_API_URL=http://localhost:5000/api/
      ```
    - Start the frontend development server:
      ```bash
@@ -164,7 +164,7 @@ Key highlights include:
    - Create a new Static Site on [Render](https://render.com).
    - Connect your GitHub repository and select the `frontend` directory.
    - Set the build command to `npm install && npm run build` and publish directory to `build`.
-   - Add the environment variable `REACT_APP_API_URL` with the backend's deployed URL (e.g., `https://your-backend.onrender.com/api`).
+   - Add the environment variable `REACT_APP_API_URL` with the backend's deployed URL (e.g., `https://your-backend.onrender.com/api/`).
 
 4. **Verify**:
    - Access the deployed frontend URL (e.g., `https://your-frontend.onrender.com`) and ensure it connects to the backend.
