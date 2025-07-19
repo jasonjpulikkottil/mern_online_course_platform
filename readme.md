@@ -102,8 +102,8 @@ Key highlights include:
 ### Local Development
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/your-username/online-course-platform.git
-   cd online-course-platform
+   git clone https://github.com/jasonjpulikkottil/mern_online_course_platform.git
+   cd mern_online_course_platform
    ```
 
 2. **Backend Setup**:
