@@ -1,38 +1,32 @@
 import api from '../utils/axiosConfig';
 
-const createLesson = async (lessonData, config) => {
-  const response = await api.post('/lessons', lessonData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    ...config,
+const createLesson = async (courseId, lessonData, onUploadProgress) => {
+  const response = await api.post(`/courses/${courseId}/lessons`, lessonData, {
+    onUploadProgress,
   });
   return response.data;
 };
 
-const getLesson = async (lessonId) => {
-  const response = await api.get(`/lessons/${lessonId}`);
+const getLessonById = async (courseId, lessonId) => {
+  const response = await api.get(`/courses/${courseId}/lessons/${lessonId}`);
   return response.data;
 };
 
-const updateLesson = async (lessonId, lessonData, config) => {
-  const response = await api.put(`/lessons/${lessonId}`, lessonData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    ...config,
+const updateLesson = async (courseId, lessonId, lessonData, onUploadProgress) => {
+  const response = await api.put(`/courses/${courseId}/lessons/${lessonId}`, lessonData, {
+    onUploadProgress,
   });
   return response.data;
 };
 
-const deleteLesson = async (lessonId) => {
-  const response = await api.delete(`/lessons/${lessonId}`);
+const deleteLesson = async (courseId, lessonId) => {
+  const response = await api.delete(`/courses/${courseId}/lessons/${lessonId}`);
   return response.data;
 };
 
 const lessonService = {
   createLesson,
-  getLesson,
+  getLessonById,
   updateLesson,
   deleteLesson,
 };

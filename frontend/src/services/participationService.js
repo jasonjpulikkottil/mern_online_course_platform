@@ -1,18 +1,27 @@
-import api from '../utils/axiosConfig';
+import axios from '../utils/axiosConfig';
 
-const getCourseProgress = async (courseId) => {
-  const response = await api.get(`/participation/course/${courseId}`);
+const logLessonCompletion = async (lessonId, isCompleted) => {
+  const response = await axios.post('/participation/lessons/completion', {
+    lessonId,
+    completed: isCompleted,
+  });
   return response.data;
 };
 
-const updateLessonProgress = async (lessonId, completed) => {
-  const response = await api.post('/participation', { lessonId, completed });
+const getStudentCourseProgress = async (courseId) => {
+  const response = await axios.get(`/participation/courses/${courseId}/progress`);
+  return response.data;
+};
+
+const getOverallProgress = async () => {
+  const response = await axios.get('/participation/progress/overall');
   return response.data;
 };
 
 const participationService = {
-  getCourseProgress,
-  updateLessonProgress,
+  logLessonCompletion,
+  getStudentCourseProgress,
+  getOverallProgress,
 };
 
 export default participationService;

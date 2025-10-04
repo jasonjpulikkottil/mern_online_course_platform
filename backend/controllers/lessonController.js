@@ -1,240 +1,223 @@
+const mongoose = require('mongoose');
 const Lesson = require('../models/Lesson');
 const Course = require('../models/Course');
+const Enrollment = require('../models/Enrollment');
 const MediaAsset = require('../models/MediaAsset'); // Import MediaAsset model
-const cloudinary = require('../config/cloudinary');
-const multer = require('multer');
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 const { createNotification } = require('./notificationController');
+const cloudinary = require('../config/cloudinary');
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }).single('media'); // 50 MB limit
+// @desc    Create new lesson for a course
+// @route   POST /api/courses/:courseId/lessons
+// @access  Private/Instructor
+const createLesson = async (req, res, next) => {
+  try {
+    const { courseId } = req.params;
+    const { title, content, order } = req.body;
 
-// Create a new lesson
-const createLesson = (req, res, next) => {
-  upload(req, res, async (err) => {
-    if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return next(new AppError('File size too large. Max 50MB allowed.', 413));
-      }
-      return next(err);
+    if (!title || !order) {
+      return next(new AppError('Please provide title and order for the lesson', 400));
     }
 
-    const { courseId, title, content, order } = req.body;
-    const instructorId = req.user.userId; // Consistent user ID from authentication middleware
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return next(new AppError('Course not found', 404));
+    }
 
-    if (!courseId || !title || !order) {
-      return next(new AppError('Course ID, title, and order are required.', 400));
+    // Ensure the authenticated user is the instructor of the course
+    if (course.instructor.toString() !== req.user.userId && req.user.role !== 'admin') {
+      return next(new AppError(`User ${req.user.userId} is not authorized to add lessons to this course`, 403));
     }
 
     let mediaData = [];
-
-    try {
-      if (req.file) {
-        const result = await new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: `course_media/${courseId}`,
-              resource_type: 'auto',
-              access_mode: req.file.mimetype.startsWith('video') ? 'public' : 'public', // Ensure videos are public
-            },
-            (error, result) => {
-              if (error) {
-                reject(error);
-              } else {
-                resolve(result);
-              }
-            }
-          );
-          uploadStream.end(req.file.buffer);
+    if (req.file) {
+      try {
+        const newMediaAsset = await MediaAsset.create({
+          type: req.file.mimetype.startsWith('image') ? 'image' : 'video',
+          url: req.file.path,
+          public_id: req.file.filename,
+          uploadedBy: req.user.userId,
         });
-
-        const newMediaAsset = new MediaAsset({
-          type: result.resource_type,
-          url: result.secure_url,
-          public_id: result.public_id,
-          uploadedBy: instructorId,
-        });
-        await newMediaAsset.save();
-
-        mediaData.push({
-          type: result.resource_type,
-          url: result.secure_url,
-          public_id: result.public_id,
-        });
+        mediaData.push({ type: newMediaAsset.type, url: newMediaAsset.url, public_id: newMediaAsset.public_id });
+      } catch (error) {
+        logger.error('Error creating media asset:', error);
+        return next(new AppError('Error creating media asset', 500));
       }
-
-      const lesson = new Lesson({
-        course: courseId,
-        title,
-        content,
-        order,
-        media: mediaData,
-      });
-      await lesson.save();
-
-      await Course.findByIdAndUpdate(courseId, { $push: { lessons: lesson._id } });
-
-      const course = await Course.findById(courseId);
-      if (!course) {
-        // This is an unlikely scenario since the previous operation would have failed
-        // but it's good practice to handle it.
-        return next(new AppError('Course not found when creating notification', 404));
-      }
-
-      // Notify the instructor about lesson creation
-      await createNotification(instructorId, `You have successfully created a new lesson: ${lesson.title} for course ${course.title}`, 'lesson_update');
-
-      res.status(201).json({ message: 'Lesson created successfully', lesson });
-    } catch (error) {
-      next(error);
     }
-  });
-};
 
-// Get a single lesson by ID
-const getLesson = async (req, res, next) => {
-  try {
-    const lesson = await Lesson.findById(req.params.id).populate('course', 'title');
-    if (!lesson) {
-      return next(new AppError('Lesson not found', 404));
+    const lesson = await Lesson.create({
+      course: courseId,
+      title,
+      content,
+      order,
+      media: mediaData,
+    });
+
+    // Add lesson to course's lessons array
+    course.lessons.push(lesson._id);
+    await course.save();
+
+    // Notify enrolled students
+    const enrollments = await Enrollment.find({ course: courseId });
+    for (const enrollment of enrollments) {
+      await createNotification(
+        req,
+        enrollment.student,
+        `A new lesson, "${title}", has been added to ${course.title}.`,
+        'lesson'
+      );
     }
-    res.status(200).json(lesson);
+
+    res.status(201).json({
+      success: true,
+      data: lesson,
+    });
   } catch (error) {
-    next(error);
+    logger.error('Error creating lesson:', error);
+    next(new AppError('Could not create lesson', 500));
   }
 };
 
-// Update a lesson
-const updateLesson = (req, res, next) => {
-  upload(req, res, async (err) => {
-    if (err) {
-      return next(err);
-    }
-
-    const { title, content, order } = req.body;
-    const lessonId = req.params.id;
-  const instructorId = req.user.userId; // Consistent user ID from authentication middleware
-
+// @desc    Get all lessons for a specific course
+// @route   GET /api/courses/:courseId/lessons
+// @access  Public
+const getLessonsByCourse = async (req, res, next) => {
   try {
-    const lesson = await Lesson.findById(lessonId);
-    if (!lesson) {
-      return next(new AppError('Lesson not found', 404));
+    const { courseId } = req.params;
+    const lessons = await Lesson.find({ course: courseId }).sort('order');
+
+    if (!lessons) {
+      return next(new AppError('Lessons not found for this course', 404));
     }
 
-    console.log('Attempting to delete lesson:', lessonId);
-    console.log('Instructor ID from token (req.user.userId):', instructorId);
-
-    const course = await Course.findById(lesson.course);
-    console.log('Course found by lesson.course:', course);
-    console.log('Course Instructor ID (course.instructor):', course?.instructor);
-
-    if (!course || (course.instructor.toString() !== instructorId.toString() && req.user.role !== 'admin')) {
-        return next(new AppError('Not authorized to update this lesson', 403));
-      }
-
-      lesson.title = title || lesson.title;
-      lesson.content = content || lesson.content;
-      lesson.order = order || lesson.order;
-
-      if (req.file) {
-        // If there's existing media, consider deleting it from Cloudinary first
-        // For simplicity, we'll just add new media. A more robust solution would handle replacement.
-        const result = await new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: `course_media/${lesson.course}`,
-              resource_type: 'auto',
-              access_mode: req.file.mimetype.startsWith('video') ? 'public' : 'public', // Ensure videos are public
-            },
-            (error, result) => {
-              if (error) {
-                reject(error);
-              } else {
-                resolve(result);
-              }
-            }
-          );
-          uploadStream.end(req.file.buffer);
-        });
-
-        const newMediaAsset = new MediaAsset({
-          type: result.resource_type,
-          url: result.secure_url,
-          public_id: result.public_id,
-          uploadedBy: instructorId,
-        });
-        await newMediaAsset.save();
-
-        lesson.media.push({
-          type: result.resource_type,
-          url: result.secure_url,
-          public_id: result.public_id,
-        });
-      }
-
-      await lesson.save();
-
-      // Notify the instructor about lesson update
-      await createNotification(instructorId, `You have successfully updated the lesson: ${lesson.title} for course ${course.title}`, 'lesson_update');
-
-      res.status(200).json({ message: 'Lesson updated successfully', lesson });
-    } catch (error) {
-      next(error);
-    }
-  });
+    res.status(200).json({
+      success: true,
+      count: lessons.length,
+      data: lessons,
+    });
+  } catch (error) {
+    logger.error('Error fetching lessons by course:', error);
+    next(new AppError('Could not fetch lessons', 500));
+  }
 };
 
-// Delete a lesson
-const deleteLesson = async (req, res, next) => {
-  const lessonId = req.params.id;
-  const instructorId = req.user.userId; // Consistent user ID from authentication middleware
-
+// @desc    Get single lesson by ID
+// @route   GET /api/lessons/:id
+// @access  Public
+const getLessonById = async (req, res, next) => {
   try {
-    const lesson = await Lesson.findById(lessonId);
+    const lesson = await Lesson.findById(req.params.id).populate('course', 'title instructor');
+
+    if (!lesson) {
+      return next(new AppError('Lesson not found', 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: lesson,
+    });
+  } catch (error) {
+    logger.error('Error fetching lesson by ID:', error);
+    next(new AppError('Could not fetch lesson', 500));
+  }
+};
+
+// @desc    Update lesson
+// @route   PUT /api/lessons/:id
+// @access  Private/Instructor
+const updateLesson = async (req, res, next) => {
+  try {
+    let lesson = await Lesson.findById(req.params.id);
+
     if (!lesson) {
       return next(new AppError('Lesson not found', 404));
     }
 
     const course = await Course.findById(lesson.course);
-    if (!course) {
-      console.warn(`Attempted to delete lesson ${lessonId} but associated course not found.`);
-      return next(new AppError('Associated course not found.', 404));
+
+    // Make sure user is course owner or admin
+    if (course.instructor.toString() !== req.user.userId && req.user.role !== 'admin') {
+      return next(new AppError(`User ${req.user.userId} is not authorized to update this lesson`, 403));
     }
 
-    console.log(`Instructor ID from token: ${instructorId}`);
-    console.log(`Course Instructor ID: ${course.instructor.toString()}`);
+    const updateFields = { ...req.body };
+    if (req.file) {
+      // If there's existing media, consider deleting it from Cloudinary first
+      // For now, just add the new media. A more robust solution would handle replacement/deletion.
+      const newMediaAsset = await MediaAsset.create({
+        type: req.file.mimetype.startsWith('image') ? 'image' : 'video',
+        url: req.file.path,
+        public_id: req.file.filename,
+        uploadedBy: req.user.userId,
+      });
+      updateFields.media = [{ type: newMediaAsset.type, url: newMediaAsset.url, public_id: newMediaAsset.public_id }];
+    }
 
-    if (course.instructor.toString() !== instructorId.toString() && req.user.role !== 'admin') {
-      console.warn(`Unauthorized attempt to delete lesson ${lessonId} by instructor ${instructorId}. Course owner: ${course.instructor}`);
-      return next(new AppError('Not authorized to delete this lesson', 403));
+    lesson = await Lesson.findByIdAndUpdate(req.params.id, updateFields, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: lesson,
+    });
+  } catch (error) {
+    logger.error('Error updating lesson:', error);
+    next(new AppError('Could not update lesson', 500));
+  }
+};
+
+// @desc    Delete lesson
+// @route   DELETE /api/lessons/:id
+// @access  Private/Instructor/Admin
+const deleteLesson = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return next(new AppError('Invalid lesson ID', 400));
+    }
+    const lesson = await Lesson.findById(req.params.id);
+
+    if (!lesson) {
+      return next(new AppError('Lesson not found', 404));
+    }
+
+    const course = await Course.findById(lesson.course);
+
+    // Make sure user is course owner or admin
+    if (course.instructor.toString() !== req.user.userId && req.user.role !== 'admin') {
+      return next(new AppError(`User ${req.user.userId} is not authorized to delete this lesson`, 403));
     }
 
     // Remove lesson from course's lessons array
-    await Course.findByIdAndUpdate(lesson.course, { $pull: { lessons: lesson._id } });
+    course.lessons.pull(lesson._id);
+    await course.save();
 
-    // Delete associated media from Cloudinary (optional, but good practice)
-    for (const mediaItem of lesson.media) {
-      if (mediaItem.public_id) {
-        try {
-          console.log(`Deleting media asset ${mediaItem.public_id} from Cloudinary.`);
-          await cloudinary.uploader.destroy(mediaItem.public_id);
-          // Also delete from MediaAsset collection
-          console.log(`Deleting media asset ${mediaItem.public_id} from MediaAsset collection.`);
-          await MediaAsset.deleteOne({ public_id: mediaItem.public_id });
-        } catch (cloudinaryError) {
-          console.error(`Error deleting media asset ${mediaItem.public_id} from Cloudinary:`, cloudinaryError);
-          // Decide if you want to continue deleting the lesson even if media deletion fails
-        }
+    // Optionally, delete media from Cloudinary when lesson is deleted
+    if (lesson.media && lesson.media.length > 0) {
+      for (const mediaItem of lesson.media) {
+        await cloudinary.uploader.destroy(mediaItem.public_id);
+        await MediaAsset.deleteOne({ public_id: mediaItem.public_id });
       }
     }
 
-    console.log(`Deleting lesson ${lessonId} from the database.`);
-    await lesson.deleteOne(); // Use deleteOne() instead of remove()
+    await lesson.deleteOne();
 
-    res.status(200).json({ message: 'Lesson deleted successfully' });
+    res.status(200).json({
+      success: true,
+      data: {},
+    });
   } catch (error) {
+    logger.error('Error deleting lesson:', error);
     next(error);
   }
 };
 
-module.exports = { createLesson, getLesson, updateLesson, deleteLesson };
+module.exports = {
+  createLesson,
+  getLessonsByCourse,
+  getLessonById,
+  updateLesson,
+  deleteLesson,
+};

@@ -1,12 +1,15 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
-const morgan = require('morgan');
+const morgan = 'morgan';
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
 const errorHandler = require('./middlewares/errorHandler');
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app); // Create HTTP server
 
 connectDB();
 
@@ -15,12 +18,13 @@ const stream = {
   write: (message) => logger.http(message.trim()),
 };
 
-const morganMiddleware = morgan(
+const morganMiddleware = require('morgan')(
   ':method :url :status :res[content-length] - :response-time ms',
   { stream }
 );
 
 app.use(morganMiddleware);
+
 // Define allowed origins. Add your Render frontend URL to this array.
 const allowedOrigins = [
   'http://localhost:3000', // For local development
@@ -29,19 +33,33 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or Postman)
-    // or requests from an allowed origin
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: '*',
   credentials: true,
 };
 
 app.use(cors(corsOptions));
+
+// Socket.io setup
+const io = new Server(server, {
+  cors: corsOptions
+});
+
+// Make io accessible to other modules
+app.set('io', io);
+
+io.on('connection', (socket) => {
+  logger.info(`New client connected: ${socket.id}`);
+  
+  socket.on('join', (userId) => {
+    socket.join(userId);
+    logger.info(`User ${userId} joined room`);
+  });
+
+  socket.on('disconnect', () => {
+    logger.info(`Client disconnected: ${socket.id}`);
+  });
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -52,15 +70,19 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/courses', require('./routes/course'));
-app.use('/api/lessons', require('./routes/lesson'));
-app.use('/api/enrollments', require('./routes/enrollment')); // New enrollment route
-app.use('/api/participation', require('./routes/participation')); // New participation route
-app.use('/api/users', require('./routes/user')); // New user management route
-app.use('/api/reports', require('./routes/report')); // New reporting route
-app.use('/api/notifications', require('./routes/notification')); // New notification route
+app.use('/api/reviews', require('./routes/reviews'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/enrollments', require('./routes/enrollment'));
+app.use('/api/participation', require('./routes/participation'));
+app.use('/api/users', require('./routes/user'));
+app.use('/api/reports', require('./routes/report'));
+app.use('/api/notifications', require('./routes/notification'));
+app.use('/api/media', require('./routes/media'));
+app.use('/api/payment', require('./routes/payment'));
+app.use('/api', require('./routes/attendance'));
 
 // Centralized Error Handler
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+server.listen(PORT, () => logger.info(`Server running on port ${PORT}`)); // Use server.listen instead of app.listen

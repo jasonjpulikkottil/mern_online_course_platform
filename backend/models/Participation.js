@@ -20,14 +20,6 @@ const participationSchema = new mongoose.Schema({
   },
 });
 
-// Add a pre-save hook to set completedAt when completed becomes true
-participationSchema.pre('save', function(next) {
-  if (this.isModified('completed') && this.completed) {
-    this.completedAt = Date.now();
-  }
-  next();
-});
-
 const Participation = mongoose.model('Participation', participationSchema);
 
 module.exports = Participation;

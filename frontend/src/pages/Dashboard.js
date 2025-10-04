@@ -6,10 +6,11 @@ import UserList from '../components/UserList';
 import CourseList from '../components/dashboard/CourseList';
 import Report from '../components/dashboard/Report';
 import CreateUserForm from '../components/dashboard/CreateUserForm';
+import DashboardAnalytics from '../components/dashboard/DashboardAnalytics';
 
 function Dashboard() {
   const { user } = useContext(AuthContext);
-  const [view, setView] = useState('main'); // 'main', 'users', 'courses', 'reports', 'createUser'
+  const [view, setView] = useState('analytics'); // 'main', 'users', 'courses', 'reports', 'createUser', 'analytics'
   const navigate = useNavigate();
 
   if (!user || (user.role !== 'admin' && user.role !== 'instructor')) {
@@ -23,25 +24,28 @@ function Dashboard() {
       </Heading>
       <Text mb={4}>Welcome to the dashboard, {user.username}!</Text>
 
-      <HStack spacing={4} mb={4}>
+      <HStack spacing={4} mb={4} flexWrap="wrap">
         {user.role === 'admin' && (
           <>
-            <Button onClick={() => setView('users')}>
+            <Button minW="150px" onClick={() => setView('users')}>
               Manage Users
             </Button>
-            <Button onClick={() => setView('createUser')}>
+            <Button minW="150px" onClick={() => setView('createUser')}>
               Create User
             </Button>
           </>
         )}
-        <Button onClick={() => setView('courses')}>
+        <Button minW="150px" onClick={() => setView('courses')}>
           Manage Courses
         </Button>
-        <Button onClick={() => navigate('/courses/new')}>
+        <Button minW="150px" onClick={() => navigate('/courses/new')}>
           Create Course
         </Button>
-        <Button onClick={() => setView('reports')}>
+        <Button minW="150px" onClick={() => setView('reports')}>
           View Reports
+        </Button>
+        <Button minW="150px" onClick={() => setView('analytics')}>
+          View Analytics
         </Button>
       </HStack>
 
@@ -49,6 +53,7 @@ function Dashboard() {
       {view === 'createUser' && <CreateUserForm />}
       {view === 'courses' && <CourseList />}
       {view === 'reports' && <Report />}
+      {view === 'analytics' && <DashboardAnalytics />}
     </Box>
   );
 }

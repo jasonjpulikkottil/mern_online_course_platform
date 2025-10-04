@@ -1,45 +1,37 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { Box, Heading, Text, Button, Table, Thead, Tbody, Tr, Th, Td } from '@chakra-ui/react';
+import React, { useState, useContext } from 'react';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { Box, Heading, Text, Button, Table, Thead, Tbody, Tr, Th, Td, Spinner, Alert, AlertIcon } from '@chakra-ui/react';
 import { AuthContext } from '../context/AuthContext';
 import userService from '../services/userService';
 import { useNotification } from '../context/NotificationContext';
 import EditUserModal from './EditUserModal';
 
+const fetchUsers = async () => {
+  const data = await userService.getUsers();
+  return data;
+};
+
 function UserList() {
-  const [users, setUsers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const { user } = useContext(AuthContext);
   const { showNotification } = useNotification();
+  const queryClient = useQueryClient();
 
-  const fetchUsers = async () => {
-    try {
-      const data = await userService.getUsers();
-      setUsers(data);
-    } catch (error) {
-      console.error('Failed to fetch users', error);
-      showNotification(error.response?.data?.message || error.message || 'Failed to fetch users', 'error');
-    }
-  };
+  const { data: users, isLoading, isError, error } = useQuery('users', fetchUsers, {
+    enabled: !!user && user.role === 'admin',
+  });
 
-  useEffect(() => {
-    if (user && user.role === 'admin') {
-      fetchUsers();
-    }
-  }, [user]);
-
-  const handleDelete = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      try {
-        await userService.deleteUser(userId);
-        setUsers(users.filter((u) => u._id !== userId));
-        showNotification('User deleted successfully', 'success');
-      } catch (error) {
-        console.error('Failed to delete user', error);
-        showNotification(error.response?.data?.message || error.message || 'Failed to delete user', 'error');
-      }
-    }
-  };
+  const deleteUserMutation = useMutation((userId) => userService.deleteUser(userId), {
+    onSuccess: () => {
+      queryClient.invalidateQueries('users');
+      showNotification('User deleted successfully', 'success');
+    },
+    onError: (err) => {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete user';
+      showNotification(errorMessage, 'error');
+    },
+  });
 
   const handleEdit = (user) => {
     setSelectedUser(user);
@@ -47,11 +39,24 @@ function UserList() {
   };
 
   const handleUserUpdated = (updatedUser) => {
-    setUsers(users.map((u) => (u._id === updatedUser._id ? updatedUser : u)));
+    queryClient.setQueryData('users', (oldUsers) =>
+      oldUsers.map((u) => (u._id === updatedUser._id ? updatedUser : u))
+    );
   };
 
   if (!user || user.role !== 'admin') {
     return <Text>You are not authorized to view this page.</Text>;
+  }
+
+  if (isLoading) return <Spinner />;
+
+  if (isError) {
+    return (
+      <Alert status="error">
+        <AlertIcon />
+        {error.message}
+      </Alert>
+    );
   }
 
   return (
@@ -69,7 +74,7 @@ function UserList() {
           </Tr>
         </Thead>
         <Tbody>
-          {users.map((u) => (
+          {users?.map((u) => (
             <Tr key={u._id}>
               <Td>{u.username}</Td>
               <Td>{u.email}</Td>
@@ -81,7 +86,12 @@ function UserList() {
                 <Button
                   size="sm"
                   colorScheme="red"
-                  onClick={() => handleDelete(u._id)}
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this user?')) {
+                      deleteUserMutation.mutate(u._id);
+                    }
+                  }}
+                  isLoading={deleteUserMutation.isLoading}
                 >
                   Delete
                 </Button>

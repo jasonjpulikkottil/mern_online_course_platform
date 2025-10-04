@@ -16,7 +16,7 @@ const getCloudinaryUsage = async (req, res) => {
 };
 
 // Get dashboard statistics
-const getDashboardStats = async (req, res) => {
+const getDashboardStats = async (req, res, next) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalCourses = await Course.countDocuments();
@@ -29,7 +29,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 // Get enrollment statistics
-const getEnrollmentStats = async (req, res) => {
+const getEnrollmentStats = async (req, res, next) => {
   try {
     const totalEnrollments = await Enrollment.countDocuments();
     const enrollmentsByCourse = await Enrollment.aggregate([
@@ -46,7 +46,7 @@ const getEnrollmentStats = async (req, res) => {
 };
 
 // Get participation statistics
-const getParticipationStats = async (req, res) => {
+const getParticipationStats = async (req, res, next) => {
   try {
     const totalCompletedLessons = await Participation.countDocuments({ completed: true });
     const totalParticipations = await Participation.countDocuments();
@@ -70,7 +70,7 @@ const getParticipationStats = async (req, res) => {
 };
 
 // Get user role distribution
-const getUserRoleDistribution = async (req, res) => {
+const getUserRoleDistribution = async (req, res, next) => {
   try {
     const roleDistribution = await User.aggregate([
       { $group: { _id: '$role', count: { $sum: 1 } } },
@@ -81,5 +81,93 @@ const getUserRoleDistribution = async (req, res) => {
   }
 };
 
-module.exports = { getDashboardStats, getEnrollmentStats, getParticipationStats, getUserRoleDistribution, getCloudinaryUsage };
+// Get detailed course statistics
+const getCourseStats = async (req, res, next) => {
+  try {
+    const courseStats = await Course.aggregate([
+      {
+        $lookup: {
+          from: 'enrollments',
+          localField: '_id',
+          foreignField: 'course',
+          as: 'enrollments',
+        },
+      },
+      {
+        $lookup: {
+          from: 'lessons',
+          localField: '_id',
+          foreignField: 'course',
+          as: 'lessons',
+        },
+      },
+      {
+        $lookup: {
+          from: 'participations',
+          localField: 'lessons._id',
+          foreignField: 'lesson',
+          as: 'participations',
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          instructor: 1,
+          createdAt: 1,
+          enrollmentCount: { $size: '$enrollments' },
+          lessonCount: { $size: '$lessons' },
+          completedLessons: {
+            $size: {
+              $filter: {
+                input: '$participations',
+                as: 'part',
+                cond: { $eq: ['$part.completed', true] },
+              },
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'instructor',
+          foreignField: 'id',
+          as: 'instructorInfo',
+        },
+      },
+      {
+        $unwind: {
+          path: '$instructorInfo',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          instructor: '$instructorInfo.username',
+          createdAt: 1,
+          enrollmentCount: 1,
+          lessonCount: 1,
+          completionRate: {
+            $cond: {
+              if: { $gt: ['$lessonCount', 0] },
+              then: {
+                $multiply: [
+                  { $divide: ['$completedLessons', '$lessonCount'] },
+                  100,
+                ],
+              },
+              else: 0,
+            },
+          },
+        },
+      },
+    ]);
+    res.status(200).json(courseStats);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getDashboardStats, getEnrollmentStats, getParticipationStats, getUserRoleDistribution, getCloudinaryUsage, getCourseStats };
 

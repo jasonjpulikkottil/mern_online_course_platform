@@ -6,8 +6,6 @@ A full-stack MERN (MongoDB, Express.js, React, Node.js) application designed to 
 - [Project Overview](#project-overview)
 - [Technologies Used](#technologies-used)
 - [Features](#features)
-  - [Implemented Features](#implemented-features)
-  - [Future Features](#future-features)
 - [Setup Instructions](#setup-instructions)
   - [Local Development](#local-development)
   - [Deployment](#deployment)
@@ -31,7 +29,6 @@ Key highlights include:
 
 ## Features
 
-### Implemented Features
 - **User Authentication and Authorization**
   - Secure registration and login for students, instructors, and administrators.
   - Role-based access control (RBAC) with roles: `student`, `instructor`, `admin`.
@@ -79,7 +76,6 @@ Key highlights include:
   - Navigation bar with light green background (`green.100`) and blue text (`blue.500`).
   - Mobile-friendly design with Chakra UI components.
 
-### Future Features
 - **Attendance Tracking**
   - Allow instructors to mark student attendance for lessons.
   - Enable students to view their attendance records.
@@ -88,14 +84,7 @@ Key highlights include:
   - Track student progress through courses and lessons.
   - Issue certificates upon course completion.
 
-- **Payment Integration**
-  - Support paid courses with secure payment gateways (e.g., Stripe, PayPal).
 
-- **Real-Time Notifications**
-  - Implement in-app and email notifications for course updates, enrollments, and other events.
-
-- **Advanced Analytics**
-  - Provide detailed insights into course performance, student engagement, and platform usage.
 
 ## Setup Instructions
 
@@ -149,6 +138,22 @@ Key highlights include:
 
 4. **Access the Application**:
    - Open your browser and go to `http://localhost:3000`.
+
+### Database Seeding
+To reset your database and seed it with initial data, follow these steps:
+
+1.  **Drop the Database**:
+    Connect to your MongoDB instance and drop the `online-course-platform` database. You can use `mongosh`:
+    ```bash
+    mongosh "mongodb://localhost:27017" --eval "db.getSiblingDB('online-course-platform').dropDatabase()"
+    ```
+
+2.  **Run Seeders**:
+    From the `backend` directory, run the following commands:
+    ```bash
+    npm run seed
+    npm run seed-courses
+    ```
 
 ### Deployment
 1. **Database**:

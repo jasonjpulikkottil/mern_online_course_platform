@@ -13,8 +13,8 @@ function Notifications() {
     const fetchNotifications = async () => {
       if (!token) return; // Don't fetch if not authenticated
       try {
-        const data = await notificationService.getNotifications(token);
-        setNotifications(data);
+        const response = await notificationService.getNotifications();
+        setNotifications(response.data);
       } catch (error) {
         showNotification(error.response?.data?.message || error.message || 'Failed to fetch notifications', 'error');
         console.error('Failed to fetch notifications', error);
@@ -25,9 +25,9 @@ function Notifications() {
 
   const handleMarkAsRead = async (id) => {
     try {
-      await notificationService.markNotificationAsRead(id, token);
+      await notificationService.markAsRead(id);
       setNotifications(prev =>
-        prev.map(notif => (notif.id === id ? { ...notif, read: true } : notif))
+        prev.map(notif => (notif._id === id ? { ...notif, read: true } : notif))
       );
       showNotification('Notification marked as read', 'success');
     } catch (error) {
@@ -39,7 +39,7 @@ function Notifications() {
   const handleClearAll = async () => {
     if (window.confirm('Are you sure you want to clear all notifications?')) {
       try {
-        await notificationService.clearAllNotifications(token);
+        await notificationService.clearAll();
         setNotifications([]);
         showNotification('All notifications cleared', 'success');
       } catch (error) {
@@ -63,7 +63,7 @@ function Notifications() {
         {notifications.length > 0 ? (
           notifications.map((notification) => (
             <Box
-              key={notification.id}
+              key={notification._id}
               p={4}
               borderWidth="1px"
               borderRadius="lg"
@@ -74,13 +74,13 @@ function Notifications() {
                 <Box>
                   <Text fontWeight={notification.read ? 'normal' : 'bold'}>{notification.message}</Text>
                   <Text fontSize="sm" color="gray.500" mt={1}>
-                    {notification.date}
+                    {new Date(notification.createdAt).toLocaleString()}
                   </Text>
                 </Box>
                 {!notification.read && (
                   <Checkbox
                     isChecked={notification.read}
-                    onChange={() => handleMarkAsRead(notification.id)}
+                    onChange={() => handleMarkAsRead(notification._id)}
                   >
                     Mark as Read
                   </Checkbox>

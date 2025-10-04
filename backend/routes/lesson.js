@@ -1,19 +1,19 @@
 const express = require('express');
-const { createLesson, getLesson, updateLesson, deleteLesson } = require('../controllers/lessonController');
+const { createLesson, getLessonsByCourse, getLessonById, updateLesson, deleteLesson } = require('../controllers/lessonController');
 const { authMiddleware, authorizeRoles } = require('../middlewares/auth');
+const upload = require('../middlewares/upload'); // Import the upload middleware
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true }); // mergeParams to get courseId from parent route
 
-// Route to create a new lesson (Instructor only)
-router.post('/', authMiddleware, authorizeRoles('instructor', 'admin'), createLesson);
+// Routes for lessons within a specific course
+router.route('/')
+  .post(authMiddleware, authorizeRoles('instructor', 'admin'), upload.single('media'), createLesson) // Create lesson for a course with media upload
+  .get(getLessonsByCourse); // Get all lessons for a course
 
-// Route to get a single lesson by ID
-router.get('/:id', authMiddleware, getLesson);
-
-// Route to update a lesson (Instructor only)
-router.put('/:id', authMiddleware, authorizeRoles('instructor', 'admin'), updateLesson);
-
-// Route to delete a lesson (Instructor only)
-router.delete('/:id', authMiddleware, authorizeRoles('instructor', 'admin'), deleteLesson);
+// Routes for individual lessons
+router.route('/:id')
+  .get(getLessonById)
+  .put(authMiddleware, authorizeRoles('instructor', 'admin'), upload.single('media'), updateLesson) // Update lesson with media upload
+  .delete(authMiddleware, authorizeRoles('instructor', 'admin'), deleteLesson);
 
 module.exports = router;

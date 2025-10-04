@@ -1,144 +1,129 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Button, Input, Heading, VStack, Select } from '@chakra-ui/react';
-import { FormControl, FormLabel } from '@chakra-ui/form-control';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Import Quill styles
-
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Box, Button, Input, Heading, VStack, Textarea, FormControl, FormLabel, useToast, List, ListItem, ListIcon, IconButton } from '@chakra-ui/react';
+import { MdEdit, MdDelete } from 'react-icons/md';
 import courseService from '../services/courseService';
-import userService from '../services/userService';
-import { AuthContext } from '../context/AuthContext';
+import lessonService from '../services/lessonService';
 import { useNotification } from '../context/NotificationContext';
 
 function CourseForm() {
+  const { id } = useParams(); // For editing existing course
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { showNotification } = useNotification();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [instructor, setInstructor] = useState('');
-  const [instructors, setInstructors] = useState([]);
-  const { id } = useParams();
-  const { user, token } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const { showNotification } = useNotification();
-  const isEditing = Boolean(id);
+  const [lessons, setLessons] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user.role === 'admin') {
-      const fetchInstructors = async () => {
-        try {
-          const instructorData = await userService.getInstructors();
-          setInstructors(instructorData);
-        } catch (error) {
-          console.error('Failed to fetch instructors', error);
-          showNotification('Failed to fetch instructors', 'error');
-        }
-      };
-      fetchInstructors();
+    if (id) {
+      setLoading(true);
+      courseService.getCourseById(id)
+        .then(data => {
+          setTitle(data.data.title);
+          setDescription(data.data.description);
+          setLessons(data.data.lessons || []);
+        })
+        .catch(err => {
+          const errorMessage = err.response?.data?.message || err.message || 'Failed to load course';
+          showNotification(errorMessage, 'error');
+          navigate('/dashboard'); // Redirect if course not found or error
+        })
+        .finally(() => setLoading(false));
     }
-
-    if (isEditing) {
-      const fetchCourse = async () => {
-        try {
-          const course = await courseService.getCourseById(id);
-          setTitle(course.title);
-          setDescription(course.description);
-          if (course.instructor) {
-            setInstructor(course.instructor._id);
-          }
-        } catch (error) {
-          console.error('Failed to fetch course', error);
-          showNotification(error.response?.data?.message || error.message || 'Failed to fetch course details', 'error');
-        }
-      };
-      fetchCourse();
-    }
-  }, [id, isEditing, showNotification, user.role]);
+  }, [id, navigate, showNotification]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const courseData = { title, description };
-    if (user.role === 'admin' && instructor) {
-      courseData.instructor = instructor;
-    }
-
+    setLoading(true);
     try {
-      if (isEditing) {
+      const courseData = { title, description };
+      if (id) {
         await courseService.updateCourse(id, courseData);
         showNotification('Course updated successfully', 'success');
       } else {
-        await courseService.createCourse(courseData);
+        const response = await courseService.createCourse(courseData);
         showNotification('Course created successfully', 'success');
+        navigate(`/courses/${response.data._id}/edit`); // Navigate to edit page to add lessons
       }
-      navigate('/dashboard');
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'An error occurred';
+      const errorMessage = err.response?.data?.errors?.[0]?.msg || err.response?.data?.message || err.message || 'Operation failed';
       showNotification(errorMessage, 'error');
       console.error(err.response?.data || err);
     }
+    setLoading(false);
   };
 
-  const quillModules = {
-    toolbar: [
-      [{ 'header': [1, 2, false] }],
-      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-      [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-      ['link'], // Removed 'image' as course form doesn't handle media directly yet
-      ['clean']
-    ],
+  const handleDeleteLesson = async (lessonId) => {
+    if (window.confirm('Are you sure you want to delete this lesson?')) {
+      try {
+        await lessonService.deleteLesson(id, lessonId);
+        setLessons(lessons.filter(lesson => lesson._id !== lessonId));
+        showNotification('Lesson deleted successfully', 'success');
+      } catch (err) {
+        const errorMessage = err.response?.data?.message || 'Failed to delete lesson';
+        showNotification(errorMessage, 'error');
+      }
+    }
   };
-
-  const quillFormats = [
-    'header',
-    'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet', 'indent',
-    'link' // Removed 'image'
-  ];
 
   return (
-    <Box maxWidth="400px" mx="auto" mt={4} p={3} borderWidth="1px" borderRadius="md">
-      <Heading as="h5" size="md" mb={3}>
-        {isEditing ? 'Edit Course' : 'Create Course'}
-      </Heading>
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4}>
-          <FormControl isRequired>
-            <FormLabel>Title</FormLabel>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </FormControl>
-          <FormControl>
-            <FormLabel>Description</FormLabel>
-            <ReactQuill
-              theme="snow"
-              value={description}
-              onChange={setDescription}
-              modules={quillModules}
-              formats={quillFormats}
-              style={{ height: '200px', marginBottom: '50px' }}
-            />
-          </FormControl>
-          {user.role === 'admin' && (
-            <FormControl>
-              <FormLabel>Instructor</FormLabel>
-              <Select
-                placeholder="Select instructor"
-                value={instructor}
-                onChange={(e) => setInstructor(e.target.value)}
-              >
-                {instructors.map((inst) => (
-                  <option key={inst._id} value={inst._id}>
-                    {inst.username}
-                  </option>
-                ))}
-              </Select>
+    <Box maxWidth="xl" mx="auto" mt={8} p={4} borderWidth="1px" borderRadius="lg" shadow="md">
+      <VStack spacing={4} align="stretch">
+        <Heading as="h1" size="lg" textAlign="center">
+          {id ? 'Edit Course' : 'Create New Course'}
+        </Heading>
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={3}>
+            <FormControl isRequired>
+              <FormLabel htmlFor="title">Course Title</FormLabel>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter course title"
+                isDisabled={loading}
+              />
             </FormControl>
-          )}
-          <Button type="submit" colorScheme="blue" width="full">
-            {isEditing ? 'Update' : 'Create'}
-          </Button>
-        </VStack>
-      </form>
+            <FormControl isRequired>
+              <FormLabel htmlFor="description">Course Description</FormLabel>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter course description"
+                rows={5}
+                isDisabled={loading}
+              />
+            </FormControl>
+            <Button type="submit" colorScheme="blue" width="full" isLoading={loading}>
+              {id ? 'Update Course' : 'Create Course'}
+            </Button>
+          </VStack>
+        </form>
+
+        {id && (
+          <Box mt={8}>
+            <Heading as="h2" size="md" mb={4}>Lessons</Heading>
+            <List spacing={3}>
+              {lessons.map(lesson => (
+                <ListItem key={lesson._id} d="flex" justifyContent="space-between" alignItems="center">
+                  {lesson.title}
+                  <Box>
+                    <IconButton as={Link} to={`/courses/${id}/lessons/${lesson._id}/edit`} icon={<MdEdit />} aria-label="Edit lesson" mr={2} />
+                    <IconButton icon={<MdDelete />} aria-label="Delete lesson" onClick={() => handleDeleteLesson(lesson._id)} />
+                  </Box>
+                </ListItem>
+              ))}
+            </List>
+            <Button as={Link} to={`/courses/${id}/lessons/new`} colorScheme="green" mt={4}>
+              Add New Lesson
+            </Button>
+          </Box>
+        )}
+      </VStack>
     </Box>
   );
 }

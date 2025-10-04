@@ -1,6 +1,6 @@
 const User = require('../models/User');
 
-exports.createUser = async (req, res) => {
+exports.createUser = async (req, res, next) => {
   try {
     const { username, email, password, role } = req.body;
 
@@ -23,29 +23,29 @@ exports.createUser = async (req, res) => {
     const newUser = await User.findById(user._id).select('-password');
     res.status(201).json(newUser);
   } catch (err) {
-    res.status(500).json({ errors: [{ msg: err.message || 'Failed to create user' }] });
+    next(err);
   }
 };
 
-exports.getAllUsers = async (req, res) => {
+exports.getAllUsers = async (req, res, next) => {
   try {
     const users = await User.find().select('-password');
     res.status(200).json(users);
   } catch (err) {
-    res.status(500).json({ errors: [{ msg: err.message || 'Failed to fetch users' }] });
+    next(err);
   }
 };
 
-exports.getAllInstructors = async (req, res) => {
+exports.getAllInstructors = async (req, res, next) => {
   try {
     const instructors = await User.find({ role: 'instructor' }).select('-password');
     res.status(200).json(instructors);
   } catch (err) {
-    res.status(500).json({ errors: [{ msg: err.message || 'Failed to fetch instructors' }] });
+    next(err);
   }
 };
 
-exports.getUserById = async (req, res) => {
+exports.getUserById = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) {
@@ -53,11 +53,11 @@ exports.getUserById = async (req, res) => {
     }
     res.status(200).json(user);
   } catch (err) {
-    res.status(500).json({ errors: [{ msg: err.message || 'Failed to fetch user' }] });
+    next(err);
   }
 };
 
-exports.updateUser = async (req, res) => {
+exports.updateUser = async (req, res, next) => {
   try {
     const { username, email, password, role } = req.body;
 
@@ -96,11 +96,11 @@ exports.updateUser = async (req, res) => {
     if (err.code === 11000) {
       return res.status(400).json({ errors: [{ msg: 'Username or email already exists' }] });
     }
-    res.status(500).json({ errors: [{ msg: err.message || 'Failed to update user' }] });
+    next(err);
   }
 };
 
-exports.deleteUser = async (req, res) => {
+exports.deleteUser = async (req, res, next) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) {
@@ -108,11 +108,11 @@ exports.deleteUser = async (req, res) => {
     }
     res.status(200).json({ message: 'User deleted successfully' });
   } catch (err) {
-    res.status(500).json({ errors: [{ msg: err.message || 'Failed to delete user' }] });
+    next(err);
   }
 };
 
-exports.updateProfile = async (req, res) => {
+exports.updateProfile = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
     const user = await User.findById(req.user.userId);
@@ -149,6 +149,7 @@ exports.updateProfile = async (req, res) => {
     if (err.code === 11000) {
       return res.status(400).json({ errors: [{ msg: 'Username or email already exists' }] });
     }
-    res.status(500).json({ errors: [{ msg: err.message || 'Failed to update profile' }] });
+    // Pass error to the error handler
+    next(err);
   }
 };

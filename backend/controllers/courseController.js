@@ -1,114 +1,110 @@
 const Course = require('../models/Course');
-const Lesson = require('../models/Lesson');
-const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
+const User = require('../models/User');
 const AppError = require('../utils/AppError');
-const { createNotification } = require('./notificationController');
+const logger = require('../utils/logger');
 
+// @desc    Create new course
+// @route   POST /api/courses
+// @access  Private/Instructor
 const createCourse = async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
   try {
-    const { title, description, instructor } = req.body;
-    const courseInstructor = (req.user.role === 'admin' && instructor) ? instructor : req.user.userId;
-    const course = new Course({ title, description, instructor: courseInstructor });
-    await course.save();
+    const { title, description } = req.body;
 
-    // Notify the instructor about course creation
-    await createNotification(courseInstructor, `You have successfully created a new course: ${course.title}`, 'new_course');
-
-    res.status(201).json({ message: 'Course created', courseId: course._id });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const getCourses = async (req, res, next) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    const keyword = req.query.keyword;
-    const instructorId = req.query.instructor;
-
-    let query = {};
-
-    if (keyword) {
-      query.$or = [
-        { title: { $regex: keyword, $options: 'i' } },
-        { description: { $regex: keyword, $options: 'i' } },
-      ];
+    if (!title || !description) {
+      return next(new AppError('Please provide title and description for the course', 400));
     }
 
-    if (instructorId) {
-      query.instructor = instructorId;
-    }
+    const course = await Course.create({
+      title,
+      description,
+      instructor: req.user.userId, // Instructor ID from authenticated user
+    });
 
-    const courses = await Course.find(query)
-      .populate('instructor', 'username')
-      .skip(skip)
-      .limit(limit);
-
-    const totalCourses = await Course.countDocuments(query);
-    const totalPages = Math.ceil(totalCourses / limit);
-
-    res.json({
-      courses,
-      page,
-      totalPages,
-      totalCourses,
+    res.status(201).json({
+      success: true,
+      data: course,
     });
   } catch (error) {
-    next(error);
+    logger.error('Error creating course:', error);
+    next(new AppError('Could not create course', 500));
   }
 };
 
+// @desc    Get all courses
+// @route   GET /api/courses
+// @access  Public
+const getCourses = async (req, res, next) => {
+  try {
+    const courses = await Course.find().populate('instructor', 'username email');
+    res.status(200).json({
+      success: true,
+      count: courses.length,
+      data: courses,
+    });
+  } catch (error) {
+    logger.error('Error fetching courses:', error);
+    next(new AppError('Could not fetch courses', 500));
+  }
+};
+
+// @desc    Get single course by ID
+// @route   GET /api/courses/:id
+// @access  Public
 const getCourseById = async (req, res, next) => {
   try {
-    const course = await Course.findById(req.params.id).populate('instructor', 'username _id').populate('lessons');
-    if (!course) return next(new AppError('Course not found', 404));
-    res.json(course);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const updateCourse = async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  try {
-    const { title, description, instructor } = req.body;
-    const course = await Course.findById(req.params.id);
+    const course = await Course.findById(req.params.id)
+      .populate('instructor', 'username email')
+      .populate('lessons'); // Populate lessons as well
 
     if (!course) {
       return next(new AppError('Course not found', 404));
     }
 
-    // Check if the user is the instructor or an admin
-    if (course.instructor.toString() !== req.user.userId && req.user.role !== 'admin') {
-      return next(new AppError('Forbidden: You are not authorized to update this course', 403));
-    }
-
-    course.title = title || course.title;
-    course.description = description || course.description;
-    if (req.user.role === 'admin' && instructor) {
-      course.instructor = instructor;
-    }
-    course.updatedAt = Date.now();
-
-    await course.save();
-    res.json({ message: 'Course updated', course });
+    res.status(200).json({
+      success: true,
+      data: course,
+    });
   } catch (error) {
-    next(error);
+    logger.error('Error fetching course by ID:', error);
+    next(new AppError('Could not fetch course', 500));
   }
 };
 
+// @desc    Update course
+// @route   PUT /api/courses/:id
+// @access  Private/Instructor
+const updateCourse = async (req, res, next) => {
+  try {
+    let course = await Course.findById(req.params.id);
+
+    if (!course) {
+      return next(new AppError('Course not found', 404));
+    }
+
+    // Make sure user is course owner
+    if (course.instructor.toString() !== req.user.userId && req.user.role !== 'admin') {
+      logger.warn(`Authorization failed: User ${req.user.userId} is not authorized to update course ${req.params.id}`);
+      return next(new AppError(`User ${req.user.userId} is not authorized to update this course`, 403));
+    }
+
+    course = await Course.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: course,
+    });
+  } catch (error) {
+    logger.error('Error updating course:', error);
+    next(new AppError('Could not update course', 500));
+  }
+};
+
+// @desc    Delete course
+// @route   DELETE /api/courses/:id
+// @access  Private/Instructor/Admin
 const deleteCourse = async (req, res, next) => {
   try {
     const course = await Course.findById(req.params.id);
@@ -117,19 +113,28 @@ const deleteCourse = async (req, res, next) => {
       return next(new AppError('Course not found', 404));
     }
 
-    // Check if the user is the instructor or an admin
+    // Make sure user is course owner or admin
     if (course.instructor.toString() !== req.user.userId && req.user.role !== 'admin') {
-      return next(new AppError('Forbidden: You are not authorized to delete this course', 403));
+      logger.warn(`Authorization failed: User ${req.user.userId} is not authorized to delete course ${req.params.id}`);
+      return next(new AppError(`User ${req.user.userId} is not authorized to delete this course`, 403));
     }
 
-    // Delete associated lessons first
-    await Lesson.deleteMany({ course: course._id });
+    await course.deleteOne();
 
-    await Course.deleteOne({ _id: req.params.id });
-    res.json({ message: 'Course deleted' });
+    res.status(200).json({
+      success: true,
+      data: {},
+    });
   } catch (error) {
-    next(error);
+    logger.error('Error deleting course:', error);
+    next(new AppError('Could not delete course', 500));
   }
 };
 
-module.exports = { createCourse, getCourses, getCourseById, updateCourse, deleteCourse };
+module.exports = {
+  createCourse,
+  getCourses,
+  getCourseById,
+  updateCourse,
+  deleteCourse,
+};

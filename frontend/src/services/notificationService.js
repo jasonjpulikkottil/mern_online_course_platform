@@ -1,22 +1,24 @@
-import axios from '../utils/axiosConfig'; // Use the configured axios instance
+import axios from '../utils/axiosConfig';
 
 const getNotifications = async () => {
   const response = await axios.get('/notifications');
-  return response.data.data;
+  return response.data;
 };
 
-const markNotificationAsRead = async (id) => {
-  await axios.put(`/notifications/${id}/read`);
+const markAsRead = async (id) => {
+  const response = await axios.put(`/notifications/${id}/read`);
+  return response.data;
 };
 
-const clearAllNotifications = async () => {
-  await axios.delete('/notifications');
+const clearAll = async () => {
+  const response = await axios.delete('/notifications');
+  return response.data;
 };
 
 const notificationService = {
   getNotifications,
-  markNotificationAsRead,
-  clearAllNotifications,
+  markAsRead,
+  clearAll,
 };
 
 export default notificationService;

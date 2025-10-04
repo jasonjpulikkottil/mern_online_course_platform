@@ -31,6 +31,8 @@ import Dashboard from './pages/Dashboard';
 import CourseDetails from './pages/CourseDetails';
 import MyCourses from './pages/MyCourses';
 import Notifications from './pages/Notifications';
+import MyProgress from './pages/MyProgress';
+import MyAttendance from './pages/MyAttendance';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function AppContent() {
@@ -38,8 +40,8 @@ function AppContent() {
   const { colorMode, toggleColorMode } = useColorMode();
   const isMobile = useBreakpointValue({ base: true, md: false });
 
-  const bgColor = useColorModeValue('gray.50', 'gray.800');
-  const textColor = useColorModeValue('gray.800', 'white');
+  const navBgColor = useColorModeValue('gray.100', 'gray.900');
+  const navLinkColor = useColorModeValue('blue.600', 'blue.200');
 
   if (loading) {
     return (
@@ -51,42 +53,50 @@ function AppContent() {
 
   const navLinks = (
     <>
-      <Button as={RouterLink} to="/courses" variant="link" color="blue.500" mr={4}>
+      <Button as={RouterLink} to="/courses" variant="ghost" color={navLinkColor} mr={4}>
         Courses
       </Button>
       {user ? (
         <>
           {user.role === 'student' && (
-            <Button as={RouterLink} to="/my-courses" variant="link" color="blue.500" mr={4}>
-              My Courses
-            </Button>
+            <>
+              <Button as={RouterLink} to="/my-courses" variant="ghost" color={navLinkColor} mr={4}>
+                My Courses
+              </Button>
+              <Button as={RouterLink} to="/my-attendance" variant="ghost" color={navLinkColor} mr={4}>
+                My Attendance
+              </Button>
+              <Button as={RouterLink} to="/my-progress" variant="ghost" color={navLinkColor} mr={4}>
+                My Progress
+              </Button>
+            </>
           )}
           {(user.role === 'admin' || user.role === 'instructor') && (
-            <Button as={RouterLink} to="/dashboard" variant="link" color="blue.500" mr={4}>
+            <Button as={RouterLink} to="/dashboard" variant="ghost" color={navLinkColor} mr={4}>
               Dashboard
             </Button>
           )}
           {user.role === 'instructor' && (
-            <Button as={RouterLink} to="/courses/new" variant="link" color="blue.500" mr={4}>
+            <Button as={RouterLink} to="/courses/new" variant="ghost" color={navLinkColor} mr={4}>
               Create Course
             </Button>
           )}
-          <Button as={RouterLink} to="/notifications" variant="link" color="blue.500" mr={4}>
+          <Button as={RouterLink} to="/notifications" variant="ghost" color={navLinkColor} mr={4}>
             Notifications
           </Button>
-          <Button as={RouterLink} to="/profile" variant="link" color="blue.500" mr={4}>
+          <Button as={RouterLink} to="/profile" variant="ghost" color={navLinkColor} mr={4}>
             Profile
           </Button>
-          <Button onClick={logout} variant="link" color="blue.500" mr={4}>
+          <Button onClick={logout} variant="ghost" color={navLinkColor} mr={4}>
             Logout
           </Button>
         </>
       ) : (
         <>
-          <Button as={RouterLink} to="/login" variant="link" color="blue.500" mr={4}>
+          <Button as={RouterLink} to="/login" variant="ghost" color={navLinkColor} mr={4}>
             Login
           </Button>
-          <Button as={RouterLink} to="/register" variant="link" color="blue.500" mr={4}>
+          <Button as={RouterLink} to="/register" variant="ghost" color={navLinkColor} mr={4}>
             Register
           </Button>
         </>
@@ -95,10 +105,10 @@ function AppContent() {
   );
 
   return (
-    <Box flexGrow={1}>
-      <Flex as="nav" bg="green.100" color="blue.500" p={4} alignItems="center">
+    <Box>
+      <Flex as="nav" bg={navBgColor} p={4} alignItems="center" shadow="md">
         <Heading as="h1" size="md">
-          <Button as={RouterLink} to="/" variant="link" color="blue.500">
+          <Button as={RouterLink} to="/" variant="ghost" color={navLinkColor}>
             Online Course Platform
           </Button>
         </Heading>
@@ -110,45 +120,53 @@ function AppContent() {
               aria-label="Options"
               icon={<HamburgerIcon />}
               variant="outline"
-              color="blue.500"
+              color={navLinkColor}
             />
             <MenuList>
-              <MenuItem as={RouterLink} to="/courses" color="blue.500">
+              <MenuItem as={RouterLink} to="/courses">
                 Courses
               </MenuItem>
               {user ? (
                 <>
                   {user.role === 'student' && (
-                    <MenuItem as={RouterLink} to="/my-courses" color="blue.500">
-                      My Courses
-                    </MenuItem>
+                    <>
+                      <MenuItem as={RouterLink} to="/my-courses">
+                        My Courses
+                      </MenuItem>
+                      <MenuItem as={RouterLink} to="/my-attendance">
+                        My Attendance
+                      </MenuItem>
+                      <MenuItem as={RouterLink} to="/my-progress">
+                        My Progress
+                      </MenuItem>
+                    </>
                   )}
                   {(user.role === 'admin' || user.role === 'instructor') && (
-                    <MenuItem as={RouterLink} to="/dashboard" color="blue.500">
+                    <MenuItem as={RouterLink} to="/dashboard">
                       Dashboard
                     </MenuItem>
                   )}
                   {user.role === 'instructor' && (
-                    <MenuItem as={RouterLink} to="/courses/new" color="blue.500">
+                    <MenuItem as={RouterLink} to="/courses/new">
                       Create Course
                     </MenuItem>
                   )}
-                  <MenuItem as={RouterLink} to="/notifications" color="blue.500">
+                  <MenuItem as={RouterLink} to="/notifications">
                     Notifications
                   </MenuItem>
-                  <MenuItem as={RouterLink} to="/profile" color="blue.500">
+                  <MenuItem as={RouterLink} to="/profile">
                     Profile
                   </MenuItem>
-                  <MenuItem onClick={logout} color="blue.500">
+                  <MenuItem onClick={logout}>
                     Logout
                   </MenuItem>
                 </>
               ) : (
                 <>
-                  <MenuItem as={RouterLink} to="/login" color="blue.500">
+                  <MenuItem as={RouterLink} to="/login">
                     Login
                   </MenuItem>
-                  <MenuItem as={RouterLink} to="/register" color="blue.500">
+                  <MenuItem as={RouterLink} to="/register">
                     Register
                   </MenuItem>
                 </>
@@ -158,11 +176,11 @@ function AppContent() {
         ) : (
           navLinks
         )}
-        <Button onClick={toggleColorMode} variant="ghost" color="blue.500" ml={4}>
+        <Button onClick={toggleColorMode} variant="ghost" color={navLinkColor} ml={4}>
           {colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
         </Button>
       </Flex>
-      <Container maxWidth="xl" mt={4} mb={4}>
+      <Container maxWidth="container.xl" mt={4} mb={4}>
         <Routes>
           <Route path="/" element={<CourseList />} />
           <Route path="/courses" element={<CourseList />} />
@@ -215,6 +233,22 @@ function AppContent() {
             }
           />
           <Route
+            path="/my-attendance"
+            element={
+              <ProtectedRoute roles={['student']}>
+                <MyAttendance />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-progress"
+            element={
+              <ProtectedRoute roles={['student']}>
+                <MyProgress />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/dashboard"
             element={
               <ProtectedRoute roles={['admin', 'instructor']}>
@@ -246,17 +280,25 @@ function AppContent() {
   );
 }
 
+import theme from './theme';
+
+import { QueryClient, QueryClientProvider } from 'react-query';
+
+const queryClient = new QueryClient();
+
 function App() {
   return (
-    <ChakraProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <Router>
-            <AppContent />
-          </Router>
-        </NotificationProvider>
-      </AuthProvider>
-    </ChakraProvider>
+    <QueryClientProvider client={queryClient}>
+      <ChakraProvider theme={theme}>
+        <AuthProvider>
+          <NotificationProvider>
+            <Router>
+              <AppContent />
+            </Router>
+          </NotificationProvider>
+        </AuthProvider>
+      </ChakraProvider>
+    </QueryClientProvider>
   );
 }
 

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { validationResult } = require('express-validator');
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 
 const register = async (req, res) => {
   const errors = validationResult(req);
@@ -21,7 +22,7 @@ const register = async (req, res) => {
     await user.save();
     res.status(201).json({ message: 'User registered', userId: user._id });
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error:', error);
     res.status(500).json({ errors: [{ msg: error.message || 'Server error during registration' }] });
   }
 };
@@ -34,16 +35,16 @@ const login = async (req, res) => {
 
   try {
     const { email, password } = req.body;
-    console.log('Login attempt:', { email, password });
+    logger.info('Login attempt:', { email });
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      console.log('User not found:', email);
+      logger.warn('User not found:', { email });
       return res.status(401).json({ errors: [{ msg: 'Invalid credentials' }] });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log('Password mismatch for user:', email);
+      logger.warn('Password mismatch for user:', { email });
       return res.status(401).json({ errors: [{ msg: 'Invalid credentials' }] });
     }
 
@@ -58,7 +59,7 @@ const login = async (req, res) => {
       user: { id: user._id, username: user.username, role: user.role },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({ errors: [{ msg: error.message || 'Server error during login' }] });
   }
 };
@@ -71,8 +72,8 @@ const getProfile = async (req, res) => {
     }
     res.json(user);
   } catch (error) {
-    console.error('Profile error:', error);
-    res.status(500).json({ errors: [{ msg: error.message || 'Server error fetching profile' }] });
+    logger.error('Profile error:', { error: error.message });
+    res.status(500).json({ errors: [{ msg: 'Server error fetching profile' }] });
   }
 };
 

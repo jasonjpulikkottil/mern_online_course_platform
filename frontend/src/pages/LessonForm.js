@@ -1,170 +1,132 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Button, Input, Text, Heading, VStack, Progress } from '@chakra-ui/react';
-import { FormControl, FormLabel } from '@chakra-ui/form-control';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Import Quill styles
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Box, Button, Input, Heading, VStack, Textarea, FormControl, FormLabel, useToast, InputGroup, InputLeftElement, Progress } from '@chakra-ui/react';
+import { FaFileUpload } from 'react-icons/fa';
 import lessonService from '../services/lessonService';
-import { AuthContext } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 
 function LessonForm() {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [order, setOrder] = useState(1);
-  const [media, setMedia] = useState(null);
-  const [mediaFileName, setMediaFileName] = useState('');
-  const [currentMediaUrl, setCurrentMediaUrl] = useState(''); // To display existing media
-  const [uploadProgress, setUploadProgress] = useState(0); // For upload progress
-  const { token } = useContext(AuthContext);
-  const { courseId, lessonId } = useParams(); // Get lessonId from params
+  const { courseId, lessonId } = useParams();
   const navigate = useNavigate();
   const { showNotification } = useNotification();
 
-  const isEditMode = !!lessonId; // Determine if in edit mode
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [media, setMedia] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
-    if (isEditMode) {
-      const fetchLesson = async () => {
-        try {
-          const data = await lessonService.getLesson(lessonId);
-          setTitle(data.title);
-          setContent(data.content);
-          setOrder(data.order);
-          if (data.media && data.media.length > 0) {
-            setCurrentMediaUrl(data.media[0].url);
-            setMediaFileName(data.media[0].url.split('/').pop()); // Extract filename from URL
-          }
-        } catch (err) {
-          const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to fetch lesson';
+    if (lessonId) {
+      setLoading(true);
+      lessonService.getLessonById(courseId, lessonId)
+        .then(data => {
+          setTitle(data.data.title);
+          setContent(data.data.content);
+          // Media handling would be more complex in a real app
+        })
+        .catch(err => {
+          const errorMessage = err.response?.data?.message || err.message || 'Failed to load lesson';
           showNotification(errorMessage, 'error');
-          console.error(err.response?.data || err);
-          navigate(`/courses/${courseId}`); // Redirect if lesson not found or error
-        }
-      };
-      fetchLesson();
+          navigate(`/courses/${courseId}/edit`);
+        })
+        .finally(() => setLoading(false));
     }
-  }, [isEditMode, lessonId, courseId, navigate, showNotification]);
+  }, [courseId, lessonId, navigate, showNotification]);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    setMedia(file);
-    setMediaFileName(file ? file.name : '');
-    setCurrentMediaUrl(''); // Clear current media URL if new file is selected
+    setMedia(e.target.files[0]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setUploadProgress(0);
 
     const formData = new FormData();
     formData.append('title', title);
     formData.append('content', content);
-    formData.append('order', order);
-    if (media) formData.append('media', media);
+    if (media) {
+      formData.append('media', media);
+    }
+    // The order field is required by the backend, let's add a placeholder
+    formData.append('order', 1);
+
+    const onUploadProgress = (progressEvent) => {
+      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      setUploadProgress(percentCompleted);
+    };
 
     try {
-      let response;
-      const config = {
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
-          console.log('Upload Progress:', percentCompleted);
-        },
-      };
-
-      if (isEditMode) {
-        response = await lessonService.updateLesson(lessonId, formData, config);
+      if (lessonId) {
+        await lessonService.updateLesson(courseId, lessonId, formData, onUploadProgress);
+        showNotification('Lesson updated successfully', 'success');
       } else {
-        formData.append('courseId', courseId);
-        response = await lessonService.createLesson(formData, config);
+        await lessonService.createLesson(courseId, formData, onUploadProgress);
+        showNotification('Lesson created successfully', 'success');
       }
-      showNotification(response.message, 'success');
-      setUploadProgress(0); // Reset progress on success
-      navigate(`/courses/${courseId}`); // Navigate back to course details after save
+      navigate(`/courses/${courseId}/edit`);
     } catch (err) {
-      setUploadProgress(0); // Reset progress on error
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || (isEditMode ? 'Failed to update lesson' : 'Failed to create lesson');
+      const errorMessage = err.response?.data?.errors?.[0]?.msg || err.response?.data?.message || err.message || 'Operation failed';
       showNotification(errorMessage, 'error');
       console.error(err.response?.data || err);
     }
+    setLoading(false);
   };
-
-  const quillModules = {
-    toolbar: [
-      [{ 'header': [1, 2, false] }],
-      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-      [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-      ['link', 'image'],
-      ['clean']
-    ],
-  };
-
-  const quillFormats = [
-    'header',
-    'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet', 'indent',
-    'link', 'image'
-  ];
 
   return (
-    <Box maxWidth="800px" mx="auto" mt={4} p={3} borderWidth="1px" borderRadius="md">
-      <Heading as="h5" size="md" mb={3}>{isEditMode ? 'Edit Lesson' : `Create Lesson for Course: ${courseId}`}</Heading>
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4} align="stretch">
-          <FormControl isRequired>
-            <FormLabel>Title</FormLabel>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </FormControl>
-          <Text fontSize="md" mt={2} mb={1}>Content</Text>
-          <ReactQuill
-            theme="snow"
-            value={content}
-            onChange={setContent}
-            modules={quillModules}
-            formats={quillFormats}
-            style={{ height: '200px', marginBottom: '50px' }}
-          />
-          <FormControl isRequired>
-            <FormLabel>Order</FormLabel>
-            <Input
-              type="number"
-              value={order}
-              onChange={(e) => setOrder(e.target.value)}
-              min={1}
-            />
-          </FormControl>
-          <Button
-            as="label"
-            htmlFor="media-upload"
-            colorScheme="blue"
-          >
-            Upload Media
-            <input
-              id="media-upload"
-              type="file"
-              hidden
-              onChange={handleFileChange}
-              accept="image/*,video/*,audio/*,application/pdf"
-            />
-          </Button>
-          {uploadProgress > 0 && (
-            <Progress value={uploadProgress} size="sm" colorScheme="blue" mt={2} minH="8px" />
-          )}
-          {console.log('Progress bar rendering with value:', uploadProgress)}
-          {(mediaFileName || currentMediaUrl) && (
-            <Text fontSize="sm" mt={1}>
-              Selected file: {mediaFileName || currentMediaUrl.split('/').pop()}
-              {currentMediaUrl && !media && ' (Current)'}
-            </Text>
-          )}
-          <Button type="submit" colorScheme="blue" width="full">
-            {isEditMode ? 'Update Lesson' : 'Create Lesson'}
-          </Button>
-        </VStack>
-      </form>
+    <Box maxWidth="xl" mx="auto" mt={8} p={4} borderWidth="1px" borderRadius="lg" shadow="md">
+      <VStack spacing={4} align="stretch">
+        <Heading as="h1" size="lg" textAlign="center">
+          {lessonId ? 'Edit Lesson' : 'Create New Lesson'}
+        </Heading>
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={3}>
+            <FormControl isRequired>
+              <FormLabel htmlFor="title">Lesson Title</FormLabel>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter lesson title"
+                isDisabled={loading}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel htmlFor="content">Lesson Content</FormLabel>
+              <Textarea
+                id="content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Enter lesson content"
+                rows={5}
+                isDisabled={loading}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel htmlFor="media">Media (Video/Image)</FormLabel>
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <FaFileUpload />
+                </InputLeftElement>
+                <Input
+                  type="file"
+                  id="media"
+                  onChange={handleFileChange}
+                  isDisabled={loading}
+                  p={1}
+                />
+              </InputGroup>
+            </FormControl>
+            {loading && media && (
+              <Progress hasStripe value={uploadProgress} width="100%" />
+            )}
+            <Button type="submit" colorScheme="blue" width="full" isLoading={loading}>
+              {lessonId ? 'Update Lesson' : 'Create Lesson'}
+            </Button>
+          </VStack>
+        </form>
+      </VStack>
     </Box>
   );
 }

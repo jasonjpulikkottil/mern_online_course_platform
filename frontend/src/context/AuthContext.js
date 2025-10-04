@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
         try {
           const userData = await authService.getProfile();
           // Standardize user ID to 'id'
-          setUser({ ...userData, id: userData._id });
+          setUser({ ...userData, id: userData._id, role: userData.role });
           setToken(storedToken);
         } catch (error) {
           console.error('Failed to load user from token:', error.response?.data?.message || error.message || error);
@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData, newToken) => {
     // Standardize user ID to 'id'
-    const standardizedUser = { ...userData, id: userData._id || userData.id };
+    const standardizedUser = { ...userData, id: userData._id || userData.id, role: userData.role };
     setUser(standardizedUser);
     setToken(newToken);
     localStorage.setItem('token', newToken);

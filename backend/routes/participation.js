@@ -1,13 +1,24 @@
 const express = require('express');
-const { logLessonCompletion, getStudentCourseProgress } = require('../controllers/participationController');
+const router = express.Router();
+const {
+  logLessonCompletion,
+  getStudentCourseProgress,
+  getOverallProgress,
+} = require('../controllers/participationController');
 const { authMiddleware, authorizeRoles } = require('../middlewares/auth');
 
-const router = express.Router();
+// Log lesson completion
+router.post('/lessons/completion', authMiddleware, authorizeRoles('student'), logLessonCompletion);
 
-// Log lesson completion (Student only)
-router.post('/', authMiddleware, authorizeRoles('student'), logLessonCompletion);
+// Get a student's progress in a specific course
+router.get(
+  '/courses/:courseId/progress',
+  authMiddleware,
+  authorizeRoles('student'),
+  getStudentCourseProgress
+);
 
-// Get a student's progress in a specific course (Student only)
-router.get('/course/:courseId', authMiddleware, authorizeRoles('student'), getStudentCourseProgress);
+// Get a student's overall progress
+router.get('/progress/overall', authMiddleware, authorizeRoles('student'), getOverallProgress);
 
 module.exports = router;

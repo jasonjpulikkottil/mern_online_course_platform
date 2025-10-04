@@ -32,6 +32,20 @@ const deleteCourse = async (courseId) => {
   return response.data;
 };
 
+const getReviewsForCourse = async (courseId) => {
+  const response = await api.get(`/courses/${courseId}/reviews`);
+  return response.data;
+};
+
+const createReview = async (courseId, reviewData) => {
+  const response = await api.post(`/courses/${courseId}/reviews`, reviewData, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  return response.data;
+};
+
 const courseService = {
   createCourse,
   getAllCourses,
@@ -39,6 +53,8 @@ const courseService = {
   getCourseById,
   updateCourse,
   deleteCourse,
+  getReviewsForCourse,
+  createReview,
 };
 
 export default courseService;

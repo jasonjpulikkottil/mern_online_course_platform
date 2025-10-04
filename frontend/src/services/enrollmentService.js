@@ -1,24 +1,47 @@
-import api from '../utils/axiosConfig';
+import axios from '../utils/axiosConfig';
 
 const enrollInCourse = async (courseId) => {
-  const response = await api.post('/enrollments', { courseId });
-  return response.data;
+  try {
+    const response = await axios.post('/enrollments', { courseId });
+    return response.data;
+  } catch (error) {
+    throw error.response.data;
+  }
 };
 
-const getMyEnrollments = async () => {
-  const response = await api.get('/enrollments/my-enrollments');
-  return response.data;
+const getMyCourses = async () => {
+  try {
+    const response = await axios.get('/enrollments/my-courses');
+    return response.data;
+  } catch (error) {
+    throw error.response.data;
+  }
+};
+
+const getEnrolledStudents = async (courseId) => {
+  try {
+    const response = await axios.get(`/courses/${courseId}/enrollments`);
+    return response.data;
+  } catch (error) {
+    throw error.response.data;
+  }
 };
 
 const checkEnrollment = async (courseId) => {
-  const response = await api.get(`/enrollments/status/${courseId}`);
-  return response.data;
+  try {
+    const response = await axios.get(`/enrollments/${courseId}/status`);
+    return response.data;
+  } catch (error) {
+    throw error.response.data;
+  }
 };
 
 const enrollmentService = {
   enrollInCourse,
-  getMyEnrollments,
+  getMyCourses,
+  getEnrolledStudents,
   checkEnrollment,
 };
 
 export default enrollmentService;
+

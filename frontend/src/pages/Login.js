@@ -21,8 +21,8 @@ function Login() {
       showNotification('Logged in successfully', 'success');
       navigate('/');
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Login failed';
-      showNotification(errorMessage, 'error');
+      const errorMsg = err.response?.data?.errors?.[0]?.msg || err.response?.data?.message || 'Login failed';
+      showNotification(errorMsg, 'error');
       console.error(err.response?.data || err);
     }
   };

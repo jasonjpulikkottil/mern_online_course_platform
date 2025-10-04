@@ -27,12 +27,12 @@ services:
 
 # You could also add a database service here, for example:
 #
-# mongodb:
-#   image: mongo:latest
-#   ports:
-#     - "27017:27017"
-#   volumes:
-#     - mongo-data:/data/db
-#
-# volumes:
-#   mongo-data:
+mongodb:
+  image: mongo:latest
+  ports:
+    - "27017:27017"
+  volumes:
+    - mongo-data:/data/db
+
+volumes:
+  mongo-data:

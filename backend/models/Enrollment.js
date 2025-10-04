@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 const enrollmentSchema = new mongoose.Schema({
-  student: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
   course: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Course',
+    required: true,
+  },
+  student: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true,
   },
   enrolledAt: {
@@ -17,6 +17,7 @@ const enrollmentSchema = new mongoose.Schema({
   },
 });
 
-const Enrollment = mongoose.model('Enrollment', enrollmentSchema);
+// Ensure a student can enroll in a course only once
+enrollmentSchema.index({ course: 1, student: 1 }, { unique: true });
 
-module.exports = Enrollment;
+module.exports = mongoose.model('Enrollment', enrollmentSchema);

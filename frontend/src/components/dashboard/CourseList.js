@@ -14,9 +14,9 @@ function CourseList() {
   const fetchCourses = async () => {
     try {
       const data = await courseService.getAllCourses();
-      // The service returns an object with a courses property
-      if (data && Array.isArray(data.courses)) {
-        setCourses(data.courses);
+      // The service returns an object with a data property which is an array of courses
+      if (data && Array.isArray(data.data)) {
+        setCourses(data.data);
       } else if (Array.isArray(data)) {
         // Fallback if the API returns a direct array
         setCourses(data);
