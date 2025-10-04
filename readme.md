@@ -129,7 +129,7 @@ Key highlights include:
      ```
    - Create a `.env` file with the following variable:
      ```plaintext
-     REACT_APP_API_URL=http://localhost:5000/api/
+     REACT_APP_API_URL=http://localhost:5000/api
      ```
    - Start the frontend development server:
      ```bash
